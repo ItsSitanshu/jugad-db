@@ -15,7 +15,7 @@ char *trim(char *str) {
     *(end + 1) = '\0';
   }
 
-    return str;
+  return str;
 }
 
 SQLCommand parse_sql(const char *command) {
@@ -35,62 +35,64 @@ SQLCommand parse_sql(const char *command) {
   if (!token) return cmd;
 
   if (strcasecmp(token, "INSERT") == 0) {
-      cmd.type = CMD_INSERT;
-      strtok(NULL, " "); 
-      strcpy(cmd.table, strtok(NULL, " "));
-      strtok(NULL, "(");
-      char *col = strtok(NULL, ")");
-      char *val;
+    cmd.type = CMD_INSERT;
+    strtok(NULL, " "); 
+    strcpy(cmd.table, strtok(NULL, " "));
+    strtok(NULL, "(");
+    char *col = strtok(NULL, ")");
+    char *val;
 
-      if (col) {
-          char *col_token = strtok(col, ",");
-          while (col_token) {
-              strcpy(cmd.columns[cmd.column_count], trim(col_token));
-              col_token = strtok(NULL, ",");
-              cmd.column_count++;
-          }
+    if (col) {
+      char *col_token = strtok(col, ",");
+      while (col_token) {
+        strcpy(cmd.columns[cmd.column_count], trim(col_token));
+        col_token = strtok(NULL, ",");
+        cmd.column_count++;
       }
+    }
 
-      strtok(NULL, "(");
-      val = strtok(NULL, ")");
-      if (val) {
-          char *val_token = strtok(val, ",");
-          int i = 0;
-          while (val_token && i < cmd.column_count) {
-              strcpy(cmd.values[i], trim(val_token));
-              val_token = strtok(NULL, ",");
-              i++;
-          }
+    strtok(NULL, "(");
+    val = strtok(NULL, ")");
+    if (val) {
+      char *val_token = strtok(val, ",");
+      int i = 0;
+      while (val_token && i < cmd.column_count) {
+        strcpy(cmd.values[i], trim(val_token));
+        val_token = strtok(NULL, ",");
+        i++;
       }
+    }
   } else if (strcasecmp(token, "SELECT") == 0) {
-      cmd.type = CMD_SELECT;
-      token = strtok(NULL, " ");
-      int col_index = 0;
-      while (token && strcasecmp(token, "FROM") != 0) {
-          if (strcmp(token, "*") != 0) {
-              strcpy(cmd.columns[col_index], trim(token));
-              col_index++;
-          }
-          token = strtok(NULL, " ");
-      }
-      cmd.column_count = col_index;
+    cmd.type = CMD_SELECT;
+    token = strtok(NULL, " ");
+    int col_index = 0;
 
-      token = strtok(NULL, " ");
-      if (token) strcpy(cmd.table, trim(token));
-
-      while ((token = strtok(NULL, " ")) != NULL) {
-          if (strcasecmp(token, "WHERE") == 0) {
-              char *where = strtok(NULL, " ");
-              if (where) strcpy(cmd.where_clause, trim(where));
-          } else if (strcasecmp(token, "ORDER") == 0) {
-              strtok(NULL, " ");
-              char *order_col = strtok(NULL, " ");
-              if (order_col) strcpy(cmd.order_by, trim(order_col));
-          } else if (strcasecmp(token, "LIMIT") == 0) {
-              char *limit_val = strtok(NULL, " ");
-              if (limit_val) cmd.limit = atoi(limit_val);
-          }
+    while (token && strcasecmp(token, "FROM") != 0) {
+      if (strcmp(token, "*") != 0) {
+        strcpy(cmd.columns[col_index], trim(token));
+        col_index++;
       }
+      token = strtok(NULL, " ");
+    }
+
+    cmd.column_count = col_index;
+
+    token = strtok(NULL, " ");
+    if (token) strcpy(cmd.table, trim(token));
+
+    while ((token = strtok(NULL, " ")) != NULL) {
+      if (strcasecmp(token, "WHERE") == 0) {
+        char *where = strtok(NULL, " ");
+        if (where) strcpy(cmd.where_clause, trim(where));
+      } else if (strcasecmp(token, "ORDER") == 0) {
+        strtok(NULL, " ");
+        char *order_col = strtok(NULL, " ");
+        if (order_col) strcpy(cmd.order_by, trim(order_col));
+      } else if (strcasecmp(token, "LIMIT") == 0) {
+        char *limit_val = strtok(NULL, " ");
+        if (limit_val) cmd.limit = atoi(limit_val);
+      }
+    }
   }
 
   return cmd;
