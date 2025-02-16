@@ -20,9 +20,11 @@ char *trim(char *str) {
 
 SQLCommand parse_sql(const char *command) {
   SQLCommand cmd;
+
   cmd.type = CMD_UNKNOWN;
   cmd.column_count = 0;
   cmd.limit = -1;
+  
   memset(cmd.table, 0, sizeof(cmd.table));
   memset(cmd.columns, 0, sizeof(cmd.columns));
   memset(cmd.values, 0, sizeof(cmd.values));
