@@ -1,20 +1,13 @@
 #include "stdio.h"
 
-#include "storage.h"
+#include "session.h"
+
 
 FILE *db_file;
 
 int main() {
-  db_file = fopen("db/record.jdb", "wb+");
-  Record rec = {1, "Alice", 100.5};
 
-  if (!db_file) {
-    perror("Failed to open file");
-    return 1;
-  }
+  start_session();
 
-  write_record(db_file, &rec);
-
-  fclose(db_file);
   return 0;
 }

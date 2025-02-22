@@ -8,6 +8,11 @@ include_directories(src)
 set(SOURCES
   src/main.c
   src/storage.c
+  src/record.c
+  src/session.c
+  src/storage.c
+  src/transaction.c
+  src/writer.c 
 )
 
 add_executable(jugad ${SOURCES})

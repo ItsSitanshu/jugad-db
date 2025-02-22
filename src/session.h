@@ -8,7 +8,8 @@ typedef enum {
   CMD_SELECT,
   CMD_UPDATE,
   CMD_DELETE,
-  CMD_UNKNOWN
+  CMD_UNKNOWN,
+  CMD_HELP
 } CommandType;
 
 typedef struct {
@@ -19,6 +20,7 @@ typedef struct {
   int column_count;
   char where_clause[128];  // WHERE conditions
   char order_by[64];       // ORDER BY column
+  bool is_odr_asc; 
   int limit;               // LIMIT count
 } SQLCommand;
 

@@ -3,6 +3,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h> 
 
 typedef enum {
   TYPE_INT,         // 4-byte integer
@@ -25,7 +26,7 @@ typedef enum {
   TYPE_ARRAY        // Array of a specific type
 } DataType;
 
-typedef struct Field;
+struct Field;
 
 typedef struct {
   char* key;
