@@ -60,7 +60,8 @@ SQLCommand parse_sql(const char *command) {
     token = strtok(NULL, " ");
     if (token && strcasecmp(token, "TABLE") == 0) {
       cmd.type = CMD_CREATE;
-      strcpy(cmd.table, strtok(NULL, " (")); 
+      strcpy(cmd.table, strtok(NULL, " ("));
+      strtok(NULL, "(");   
       
       char *col_definitions = strtok(NULL, ")");
       if (col_definitions) {
@@ -238,6 +239,15 @@ bool execute_command(SQLCommand *cmd) {
   return true;
 }
 
+#define COLOR_RESET   "\033[0m"
+#define COLOR_BOLD    "\033[1m"
+#define COLOR_GREEN   "\033[32m"
+#define COLOR_YELLOW  "\033[33m"
+#define COLOR_RED     "\033[31m"
+#define COLOR_BLUE    "\033[34m"
+#define COLOR_CYAN    "\033[36m"
+#define COLOR_MAGENTA "\033[35m"
+
 void start_session() {
   char command[256];
   FILE *db_file = NULL;
@@ -245,13 +255,14 @@ void start_session() {
   char cwd[256] = "";
 
   if (!getcwd(cwd, sizeof(cwd))) {
-    strcpy(cwd, "ukwn/"); 
+    strcpy(cwd, "unknown/"); 
   }
 
-  printf("Welcome to Jugad-DB! Type '.schema <DATABASE_NAME.jdb>' to select a SCHEMA FILE\n");
+  printf("Welcome to Jugad-DB! Type " COLOR_BOLD "'.schema <NAME.jdb>'" COLOR_RESET " to select a" COLOR_BOLD " SCHEMA FILE\n");
 
   while (1) {
-    printf("%s: jugad-db@[%s] $ ", cwd, selected_db[0] ? selected_db : "~");
+    printf(COLOR_GREEN "%s" COLOR_RESET ": " COLOR_CYAN "jugad-db@[%s]" COLOR_RESET " $ ", 
+      cwd, selected_db[0] ? selected_db : "~");
     
     if (!fgets(command, sizeof(command), stdin)) break;
 
@@ -259,31 +270,30 @@ void start_session() {
 
     if (strncmp(command, ".schema ", 8) == 0) {
       char *db_name = command + 8; 
-  
+
       if (strlen(db_name) < 4 || strcmp(db_name + strlen(db_name) - 4, ".jdb") != 0) {
-        printf("Error: Invalid file. Please provide a .jdb file.\n");
+        printf(COLOR_RED "Error: Invalid file. Please provide a .jdb file.\n" COLOR_RESET);
         continue;
       }
-  
+
       int db_existed = access(db_name, F_OK) == 0;
       
       if (db_file) fclose(db_file);
 
-      db_file = fopen(db_name, "w");
+      db_file = fopen(db_name, "a+"); // Creates file if not exists
       if (!db_file) {
-        printf("Error: Could not open or create database file '%s'.\n", db_name);
+        printf(COLOR_RED "Error: Could not open or create database file '%s'.\n" COLOR_RESET, db_name);
         continue;
       }
-  
+
       strcpy(selected_db, db_name);
 
-      printf("Database %s: %s\n", db_existed ? "entered" : "created", selected_db);
+      printf(COLOR_GREEN "Database %s: %s\n" COLOR_RESET, db_existed ? "entered" : "created", selected_db);
       continue;
     }
-  
 
     if (!db_file) {
-      printf("Error: No database selected. Use 'ENTER <database.jdb>' to select one.\n");
+      printf(COLOR_RED "Error: No database selected. Use '.schema <database.jdb>' to select one.\n" COLOR_RESET);
       continue;
     }
 
@@ -291,7 +301,7 @@ void start_session() {
     execute_command(&parsed_command);
   }
 
-  printf("Session closed.\n");
+  printf(COLOR_MAGENTA "Session closed.\n" COLOR_RESET);
 
   if (db_file) fclose(db_file);
 }
