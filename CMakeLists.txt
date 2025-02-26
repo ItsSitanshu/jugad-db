@@ -11,7 +11,7 @@ set(SOURCES
   src/record.c
   src/session.c
   src/storage.c
-  src/writer.c 
+  src/jdl.c 
   src/parser.c
 )
 
