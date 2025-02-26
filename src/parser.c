@@ -48,12 +48,16 @@ int parse_create_table(const char *query, SQLCommand *cmd) {
   strncpy(query_copy, query, sizeof(query_copy) - 1);
   query_copy[sizeof(query_copy) - 1] = '\0'; 
 
-  token = strtok(NULL, " (");
+  char *token = strtok(query_copy, " ("); // Ensure token is declared
   if (!token) return 0;
   strncpy(cmd->table, trim(token), sizeof(cmd->table) - 1);
   cmd->table[sizeof(cmd->table) - 1] = '\0';
 
   cmd->column_count = 0;
+  
+  char *col_definitions = strtok(NULL, ")");
+  if (!col_definitions) return 0; // Ensure col_definitions is valid
+
   char *col_token = strtok(col_definitions, ",");
   while (col_token && cmd->column_count < MAX_COLUMNS) {
     col_token = trim(col_token);
@@ -70,15 +74,15 @@ int parse_create_table(const char *query, SQLCommand *cmd) {
     switch (cmd->columns.create[cmd->column_count].type) {
       case TYPE_CHAR:
       case TYPE_VARCHAR:
-          type_token = strtok(NULL, " ");
-          if (type_token && type_token[0] == '(') {
-              cmd->columns.create[cmd->column_count].size = atoi(type_token + 1);
-          } else {
-              cmd->columns.create[cmd->column_count].size = 255;
-          }
-          break;
+        type_token = strtok(NULL, " ");
+        if (type_token && type_token[0] == '(') {
+          cmd->columns.create[cmd->column_count].size = atoi(type_token + 1);
+        } else {
+          cmd->columns.create[cmd->column_count].size = 255;
+        }
+        break;
       default:
-          cmd->columns.create[cmd->column_count].size = 0;
+        cmd->columns.create[cmd->column_count].size = 0;
     }
 
     cmd->column_count++;
@@ -111,7 +115,8 @@ SQLCommand parse_sql(const char *command) {
   if (strcasecmp(token, "CREATE") == 0) {
     token = strtok(NULL, " ");
     if (token && strcasecmp(token, "TABLE") == 0) {
-      parse_create_table(token, CO)
+      token = strtok(NULL, " ");
+      parse_create_table(token, &cmd);
     }
   }
 
