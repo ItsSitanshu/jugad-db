@@ -38,16 +38,6 @@ SQLCommand parse_sql(const char *command) {
   memset(cmd.where_clause, 0, sizeof(cmd.where_clause));
   memset(cmd.order_by, 0, sizeof(cmd.order_by));
 
-  if (strcmp(command, ".quit") == 0 || strncmp(command, ".quit", 5) == 0) {
-    printf("Exiting...\n");
-    exit(0);
-  }
-
-  if (strcmp(command, ".help") == 0 || strncmp(command, ".help", 5) == 0) {
-    cmd.type = CMD_HELP;
-    return cmd;
-  }
-
   char query[256];
   strncpy(query, command, sizeof(query) - 1);
   query[sizeof(query) - 1] = '\0';  // Ensure null termination
@@ -192,45 +182,46 @@ bool execute_command(SQLCommand *cmd) {
 
     case CMD_HELP:
       printf(
-        "\nJUGAD-DB COMMAND REFERENCE\n"
-
-        "GENERAL COMMANDS\n"
-        "  .quit                Exit the database system.\n"
-        "  .help                Show this help menu.\n\n"
-
-        "DATA DEFINITION LANGUAGE (JDL)\n"
-        "  CREATE TABLE <name> (<column definitions>);\n"
+        "\n" COLOR_BOLD "JUGAD-DB COMMAND REFERENCE\n" COLOR_RESET
+    
+        COLOR_YELLOW "GENERAL COMMANDS\n" COLOR_RESET
+        COLOR_CYAN "  .quit                " COLOR_RESET "Exit the database system.\n"
+        COLOR_CYAN "  .help                " COLOR_RESET "Show this help menu.\n\n"
+        COLOR_CYAN "  .schema <name>       " COLOR_RESET "Selects schema file.\n\n"
+        COLOR_CYAN "  .clear               " COLOR_RESET "Clears screen.\n\n"
+    
+        COLOR_YELLOW "DATA DEFINITION LANGUAGE (JDL)\n" COLOR_RESET
+        COLOR_CYAN "  CREATE TABLE <name> (<column definitions>);\n" COLOR_RESET
         "      Define a new table.\n"
-        "  ALTER TABLE <name> ADD COLUMN <column definition>;\n"
+        COLOR_CYAN "  ALTER TABLE <name> ADD COLUMN <column definition>;\n" COLOR_RESET
         "      Modify an existing table.\n\n"
-
-        "DATA QUERY / MODIFICATION LANGUAGE (DQL)\n"
-        "  INSERT INTO <table> (<columns>) VALUES (<values>);\n"
+    
+        COLOR_YELLOW "DATA QUERY / MODIFICATION LANGUAGE (DQL)\n" COLOR_RESET
+        COLOR_CYAN "  INSERT INTO <table> (<columns>) VALUES (<values>);\n" COLOR_RESET
         "      Insert new rows into a table.\n"
-        "  UPDATE <table> SET <column> = <value> WHERE <condition>;\n"
+        COLOR_CYAN "  UPDATE <table> SET <column> = <value> WHERE <condition>;\n" COLOR_RESET
         "      Update existing records.\n"
-        "  DELETE FROM <table> WHERE <condition>;\n"
-        "      Delete records.\n"
-
-        "  SELECT <columns> FROM <table> WHERE <condition> ORDER BY <column> [ASRT|DSRT] LIMIT <n>;\n"
+        COLOR_CYAN "  DELETE FROM <table> WHERE <condition>;\n" COLOR_RESET
+        "      Delete records.\n\n"
+    
+        COLOR_CYAN "  SELECT <columns> FROM <table> WHERE <condition> ORDER BY <column> [ASRT|DSRT] LIMIT <n>;\n" COLOR_RESET
         "      Retrieve data from a table.\n"
-        "  SELECT <columns> FROM <table> JOIN <table> ON <condition>;\n"
+        COLOR_CYAN "  SELECT <columns> FROM <table> JOIN <table> ON <condition>;\n" COLOR_RESET
         "      Perform joins between tables.\n"
-        "  SELECT <column>, SUM(<column>) AS <alias> FROM <table> GROUP BY <column>;\n"
+        COLOR_CYAN "  SELECT <column>, SUM(<column>) AS <alias> FROM <table> GROUP BY <column>;\n" COLOR_RESET
         "      Aggregate data.\n\n"
-
-        "SYNTAX NOTES\n"
-        "  - PRM  : Primary Key\n"
-        "  - FRN REF <table>(<column>) : Foreign Key\n"
-        "  - ODR  : ORDER BY\n"
-        "  - ASRT : Ascending order (default)\n"
-        "  - DSRT : Descending order\n"
-        "  - LIM  : LIMIT rows returned\n\n"
-
+    
+        COLOR_YELLOW "SYNTAX NOTES\n" COLOR_RESET
+        "  - " COLOR_BOLD "PRM  " COLOR_RESET ": Primary Key\n"
+        "  - " COLOR_BOLD "FRN REF <table>(<column>) " COLOR_RESET ": Foreign Key\n"
+        "  - " COLOR_BOLD "ODR  " COLOR_RESET ": ORDER BY\n"
+        "  - " COLOR_BOLD "ASRT " COLOR_RESET ": Ascending order (default)\n"
+        "  - " COLOR_BOLD "DSRT " COLOR_RESET ": Descending order\n"
+        "  - " COLOR_BOLD "LIM  " COLOR_RESET ": LIMIT rows returned\n\n"
+    
         "For further details and examples, refer to documentation and test/ .jql/.jcl files.\n\n"
       );
       break;
-
     default:
       printf("Unknown command! Use .help to obtain a list of valid commands and .quit to kill this session\n");
       return false;
@@ -238,15 +229,6 @@ bool execute_command(SQLCommand *cmd) {
 
   return true;
 }
-
-#define COLOR_RESET   "\033[0m"
-#define COLOR_BOLD    "\033[1m"
-#define COLOR_GREEN   "\033[32m"
-#define COLOR_YELLOW  "\033[33m"
-#define COLOR_RED     "\033[31m"
-#define COLOR_BLUE    "\033[34m"
-#define COLOR_CYAN    "\033[36m"
-#define COLOR_MAGENTA "\033[35m"
 
 void start_session() {
   char command[256];
@@ -261,12 +243,26 @@ void start_session() {
   printf("Welcome to Jugad-DB! Type " COLOR_BOLD "'.schema <NAME.jdb>'" COLOR_RESET " to select a" COLOR_BOLD " SCHEMA FILE\n");
 
   while (1) {
-    printf(COLOR_GREEN "%s" COLOR_RESET ": " COLOR_CYAN "jugad-db@[%s]" COLOR_RESET " $ ", 
+    printf(COLOR_RESET COLOR_MAGENTA "%s" COLOR_RESET ": " COLOR_CYAN "jugad-db@[%s]" COLOR_RESET " $ ", 
       cwd, selected_db[0] ? selected_db : "~");
     
     if (!fgets(command, sizeof(command), stdin)) break;
 
     command[strcspn(command, "\n")] = 0;
+
+    if (strcmp(command, ".clear") == 0) {
+      printf("\033[H\033[J");
+      continue;
+    }
+
+    if (strcmp(command, ".quit") == 0 || strncmp(command, ".quit", 5) == 0) {
+      printf("Exiting...\n");
+      exit(0);
+    }
+  
+    if (strcmp(command, ".help") == 0 || strncmp(command, ".help", 5) == 0) {
+      execute_command(&(SQLCommand){type: CMD_HELP});
+    }  
 
     if (strncmp(command, ".schema ", 8) == 0) {
       char *db_name = command + 8; 
