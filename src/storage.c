@@ -78,13 +78,12 @@ void read_record(FILE *file, Record *rec) {
 }
 
 void create_table (
-  const char *filename,
+  const char *db,
   const char *table_name,
   Column *columns,
   int column_count
 ) {
-  
-    FILE *file = fopen("database.jdb", "ab");
+  FILE *file = fopen(db, "ab");
 
   if (!file) {
     printf("Error: Could not open database file.\n");
@@ -103,5 +102,6 @@ void create_table (
 
   fwrite(&schema, sizeof(TableSchema), 1, file);
   fclose(file);
+  
   printf("Table '%s' created successfully.\n", table_name);
 }

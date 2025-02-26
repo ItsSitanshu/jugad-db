@@ -1,4 +1,5 @@
 #include "session.h"
+#include "storage.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -6,154 +7,15 @@
 #include <ctype.h>
 #include <unistd.h> 
 
-char *trim(char *str) {
-  while (*str == ' ') str++;
-  
-  if (*str == '\0') return str;
-  
-  char *end = str + strlen(str) - 1;
-  
-  while (end > str && (*end == ' ' || *end == '\n' || *end == '\r')) {
-    *(end + 1) = '\0';
-    end--;
-  }
-
-  return str;
-}
-
-void trim_leading_spaces(char *str) {
-  while (isspace((unsigned char)*str)) str++;  // Move pointer past spaces
-  memmove(str - (str - str), str, strlen(str) + 1);
-}
-
-SQLCommand parse_sql(const char *command) {
-  SQLCommand cmd;
-
-  cmd.type = CMD_UNKNOWN;
-  cmd.column_count = 0;
-  cmd.limit = -1;
-  memset(cmd.table, 0, sizeof(cmd.table));
-  memset(cmd.columns, 0, sizeof(cmd.columns));
-  memset(cmd.values, 0, sizeof(cmd.values));
-  memset(cmd.where_clause, 0, sizeof(cmd.where_clause));
-  memset(cmd.order_by, 0, sizeof(cmd.order_by));
-
-  char query[256];
-  strncpy(query, command, sizeof(query) - 1);
-  query[sizeof(query) - 1] = '\0';  // Ensure null termination
-  trim_leading_spaces(query);  // Fix leading space issue
-
-  char *token = strtok(query, " ");
-  if (!token) return cmd;
-
-  if (strcasecmp(token, "CREATE") == 0) {
-    token = strtok(NULL, " ");
-    if (token && strcasecmp(token, "TABLE") == 0) {
-      cmd.type = CMD_CREATE;
-      strcpy(cmd.table, strtok(NULL, " ("));
-      strtok(NULL, "(");   
-      
-      char *col_definitions = strtok(NULL, ")");
-      if (col_definitions) {
-        char *col_token = strtok(col_definitions, ",");
-        while (col_token) {
-          strcpy(cmd.columns[cmd.column_count], trim(col_token));
-          col_token = strtok(NULL, ",");
-          cmd.column_count++;
-        }
-      }
-    }
-  }
-
-  if (strcasecmp(token, "INSERT") == 0) {
-    cmd.type = CMD_INSERT;
-    strtok(NULL, " ");  // Skip "INTO"
-    strcpy(cmd.table, strtok(NULL, " "));  // Get table name
-
-    strtok(NULL, "(");
-    char *col = strtok(NULL, ")");
-    char *val;
-
-    if (col) {
-      char *col_token = strtok(col, ",");
-      while (col_token) {
-        strcpy(cmd.columns[cmd.column_count], trim(col_token));
-        col_token = strtok(NULL, ",");
-        cmd.column_count++;
-      }
-    }
-
-    strtok(NULL, "(");
-    val = strtok(NULL, ")");
-    if (val) {
-      char *val_token = strtok(val, ",");
-      int i = 0;
-      while (val_token && i < cmd.column_count) {
-        strcpy(cmd.values[i], trim(val_token));
-        val_token = strtok(NULL, ",");
-        i++;
-      }
-    }
-  }
-
-  else if (strcasecmp(token, "SELECT") == 0) {
-    cmd.type = CMD_SELECT;
-    token = strtok(NULL, " ");
-    int col_index = 0;
-
-    while (token && strcasecmp(token, "FROM") != 0) {
-      if (strcmp(token, "*") != 0) {
-        strcpy(cmd.columns[col_index], trim(token));
-        col_index++;
-      }
-      token = strtok(NULL, " ");
-    }
-
-    cmd.column_count = col_index;
-    token = strtok(NULL, " ");
-    if (token) strcpy(cmd.table, trim(token));
-
-    while ((token = strtok(NULL, " ")) != NULL) {
-      if (strcasecmp(token, "WHERE") == 0) {
-        char *where = strtok(NULL, " ");
-        if (where) strcpy(cmd.where_clause, trim(where));
-      } else if (strcasecmp(token, "ODR") == 0) {
-        strtok(NULL, " "); 
-        char *order_col = strtok(NULL, " ");
-        if (order_col) strcpy(cmd.order_by, trim(order_col));
-        
-        char *sort_order = strtok(NULL, " ");
-        if (sort_order) {
-          if (strcasecmp(sort_order, "DSRT") == 0) {
-            cmd.is_odr_asc = false;
-          } else if (strcasecmp(sort_order, "ASRT") == 0) {
-            cmd.is_odr_asc = true;
-          }
-        }
-      } else if (strcasecmp(token, "LIMIT") == 0) {
-        char *limit_val = strtok(NULL, " ");
-        if (limit_val) cmd.limit = atoi(limit_val);
-      }
-    }
-  }
-
-  return cmd;
-}
-
-bool execute_command(SQLCommand *cmd) {
+bool execute_command(const char *db, SQLCommand *cmd) {
   switch (cmd->type) {
     case CMD_CREATE:
-      printf("Creating table %s\n", cmd->table);
-      printf("Columns:\n");
-      for (int i = 0; i < cmd->column_count; i++) {
-        printf("  - %s\n", cmd->columns[i]);
-      }
+      create_table(db, cmd->table, cmd->columns.create, cmd->column_count);
       break;
-
     case CMD_INSERT:
       printf("Executing INSERT into %s\n", cmd->table);
       for (int i = 0; i < cmd->column_count; i++) {
-        printf("\t  %s = %s\n", cmd->columns[i], cmd->values[i]);
+        printf("\t  %s = %s\n", cmd->columns.cols[i], cmd->values[i]);
       }
       break;
 
@@ -162,7 +24,7 @@ bool execute_command(SQLCommand *cmd) {
       if (cmd->column_count > 0) {
         printf("\tColumns: \n");
         for (int i = 0; i < cmd->column_count; i++) {
-          printf("%s ", cmd->columns[i]);
+          printf("%s ", cmd->columns.cols[i]);
         }
         printf("\n");
       }
@@ -182,42 +44,42 @@ bool execute_command(SQLCommand *cmd) {
 
     case CMD_HELP:
       printf(
-        "\n" COLOR_BOLD "JUGAD-DB COMMAND REFERENCE\n" COLOR_RESET
+        "\n" _BLD "JUGAD-DB COMMAND REFERENCE\n" _R
     
-        COLOR_YELLOW "GENERAL COMMANDS\n" COLOR_RESET
-        COLOR_CYAN "  .quit                " COLOR_RESET "Exit the database system.\n"
-        COLOR_CYAN "  .help                " COLOR_RESET "Show this help menu.\n\n"
-        COLOR_CYAN "  .schema <name>       " COLOR_RESET "Selects schema file.\n\n"
-        COLOR_CYAN "  .clear               " COLOR_RESET "Clears screen.\n\n"
+        _YLW "GENERAL COMMANDS\n" _R
+        _CY "  .quit                " _R "Exit the database system.\n"
+        _CY "  .help                " _R "Show this help menu.\n\n"
+        _CY "  .schema <name>       " _R "Selects schema file.\n\n"
+        _CY "  .clear               " _R "Clears screen.\n\n"
     
-        COLOR_YELLOW "DATA DEFINITION LANGUAGE (JDL)\n" COLOR_RESET
-        COLOR_CYAN "  CREATE TABLE <name> (<column definitions>);\n" COLOR_RESET
+        _YLW "DATA DEFINITION LANGUAGE (JDL)\n" _R
+        _CY "  CREATE TABLE <name> (<column definitions>);\n" _R
         "      Define a new table.\n"
-        COLOR_CYAN "  ALTER TABLE <name> ADD COLUMN <column definition>;\n" COLOR_RESET
+        _CY "  ALTER TABLE <name> ADD COLUMN <column definition>;\n" _R
         "      Modify an existing table.\n\n"
     
-        COLOR_YELLOW "DATA QUERY / MODIFICATION LANGUAGE (DQL)\n" COLOR_RESET
-        COLOR_CYAN "  INSERT INTO <table> (<columns>) VALUES (<values>);\n" COLOR_RESET
+        _YLW "DATA QUERY / MODIFICATION LANGUAGE (DQL)\n" _R
+        _CY "  INSERT INTO <table> (<columns>) VALUES (<values>);\n" _R
         "      Insert new rows into a table.\n"
-        COLOR_CYAN "  UPDATE <table> SET <column> = <value> WHERE <condition>;\n" COLOR_RESET
+        _CY "  UPDATE <table> SET <column> = <value> WHERE <condition>;\n" _R
         "      Update existing records.\n"
-        COLOR_CYAN "  DELETE FROM <table> WHERE <condition>;\n" COLOR_RESET
+        _CY "  DELETE FROM <table> WHERE <condition>;\n" _R
         "      Delete records.\n\n"
     
-        COLOR_CYAN "  SELECT <columns> FROM <table> WHERE <condition> ORDER BY <column> [ASRT|DSRT] LIMIT <n>;\n" COLOR_RESET
+        _CY "  SELECT <columns> FROM <table> WHERE <condition> ORDER BY <column> [ASRT|DSRT] LIMIT <n>;\n" _R
         "      Retrieve data from a table.\n"
-        COLOR_CYAN "  SELECT <columns> FROM <table> JOIN <table> ON <condition>;\n" COLOR_RESET
+        _CY "  SELECT <columns> FROM <table> JOIN <table> ON <condition>;\n" _R
         "      Perform joins between tables.\n"
-        COLOR_CYAN "  SELECT <column>, SUM(<column>) AS <alias> FROM <table> GROUP BY <column>;\n" COLOR_RESET
+        _CY "  SELECT <column>, SUM(<column>) AS <alias> FROM <table> GROUP BY <column>;\n" _R
         "      Aggregate data.\n\n"
     
-        COLOR_YELLOW "SYNTAX NOTES\n" COLOR_RESET
-        "  - " COLOR_BOLD "PRM  " COLOR_RESET ": Primary Key\n"
-        "  - " COLOR_BOLD "FRN REF <table>(<column>) " COLOR_RESET ": Foreign Key\n"
-        "  - " COLOR_BOLD "ODR  " COLOR_RESET ": ORDER BY\n"
-        "  - " COLOR_BOLD "ASRT " COLOR_RESET ": Ascending order (default)\n"
-        "  - " COLOR_BOLD "DSRT " COLOR_RESET ": Descending order\n"
-        "  - " COLOR_BOLD "LIM  " COLOR_RESET ": LIMIT rows returned\n\n"
+        _YLW "SYNTAX NOTES\n" _R
+        "  - " _BLD "PRM  " _R ": Primary Key\n"
+        "  - " _BLD "FRN REF <table>(<column>) " _R ": Foreign Key\n"
+        "  - " _BLD "ODR  " _R ": ORDER BY\n"
+        "  - " _BLD "ASRT " _R ": Ascending order (default)\n"
+        "  - " _BLD "DSRT " _R ": Descending order\n"
+        "  - " _BLD "LIM  " _R ": LIMIT rows returned\n\n"
     
         "For further details and examples, refer to documentation and test/ .jql/.jcl files.\n\n"
       );
@@ -240,10 +102,10 @@ void start_session() {
     strcpy(cwd, "unknown/"); 
   }
 
-  printf("Welcome to Jugad-DB! Type " COLOR_BOLD "'.schema <NAME.jdb>'" COLOR_RESET " to select a" COLOR_BOLD " SCHEMA FILE\n");
+  printf("Welcome to Jugad-DB! Type " _BLD "'.schema <NAME.jdb>'" _R " to select a" _BLD " SCHEMA FILE\n");
 
   while (1) {
-    printf(COLOR_RESET COLOR_MAGENTA "%s" COLOR_RESET ": " COLOR_CYAN "jugad-db@[%s]" COLOR_RESET " $ ", 
+    printf(_R _GRN "%s" _R ": " _BLU "jugad-db@[%s]" _R " $ ", 
       cwd, selected_db[0] ? selected_db : "~");
     
     if (!fgets(command, sizeof(command), stdin)) break;
@@ -261,14 +123,14 @@ void start_session() {
     }
   
     if (strcmp(command, ".help") == 0 || strncmp(command, ".help", 5) == 0) {
-      execute_command(&(SQLCommand){type: CMD_HELP});
+      execute_command("", &(SQLCommand){type: CMD_HELP});
     }  
 
     if (strncmp(command, ".schema ", 8) == 0) {
       char *db_name = command + 8; 
 
       if (strlen(db_name) < 4 || strcmp(db_name + strlen(db_name) - 4, ".jdb") != 0) {
-        printf(COLOR_RED "Error: Invalid file. Please provide a .jdb file.\n" COLOR_RESET);
+        printf(_RED "Error: Invalid file. Please provide a .jdb file.\n" _R);
         continue;
       }
 
@@ -276,28 +138,28 @@ void start_session() {
       
       if (db_file) fclose(db_file);
 
-      db_file = fopen(db_name, "a+"); // Creates file if not exists
+      db_file = fopen(db_name, "a+");
       if (!db_file) {
-        printf(COLOR_RED "Error: Could not open or create database file '%s'.\n" COLOR_RESET, db_name);
+        printf(_RED "Error: Could not open or create database file '%s'.\n" _R, db_name);
         continue;
       }
 
       strcpy(selected_db, db_name);
 
-      printf(COLOR_GREEN "Database %s: %s\n" COLOR_RESET, db_existed ? "entered" : "created", selected_db);
+      printf(_GRN "Database %s: %s\n" _R, db_existed ? "entered" : "created", selected_db);
       continue;
     }
 
     if (!db_file) {
-      printf(COLOR_RED "Error: No database selected. Use '.schema <database.jdb>' to select one.\n" COLOR_RESET);
+      printf(_RED "Error: No database selected. Use '.schema <database.jdb>' to select one.\n" _R);
       continue;
     }
 
     SQLCommand parsed_command = parse_sql(command);
-    execute_command(&parsed_command);
+    execute_command(selected_db, &parsed_command);
   }
 
-  printf(COLOR_MAGENTA "Session closed.\n" COLOR_RESET);
+  printf(_MAG "Session closed.\n" _R);
 
   if (db_file) fclose(db_file);
 }

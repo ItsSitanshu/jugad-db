@@ -12,6 +12,7 @@ set(SOURCES
   src/session.c
   src/storage.c
   src/writer.c 
+  src/parser.c
 )
 
 add_executable(jugad ${SOURCES})
