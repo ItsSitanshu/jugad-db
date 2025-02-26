@@ -8,8 +8,13 @@ You may modify, steal and use my terrible database implementation to make money.
 
 ## To-do List
 
+- Implement proper parsing
 - Implement `CREATE TABLE` with `KP` (Primary Key) and `FRN` (Foreign Key)  
-- Support `INSERT`, `SELECT`, `UPDATE`, `DELETE` operations  
+- Support 
+  - `INSERT`
+  - `SELECT`
+  - `UPDATE`
+  - `DELETE`  
 - Add indexing for performance optimization  
 - Implement `JOIN` operations  
 - Support transactions (`BEGIN`, `COMMIT`, `ROLLBACK`)  
