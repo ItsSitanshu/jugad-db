@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
+#include <unistd.h> 
 
 char *trim(char *str) {
   while (*str == ' ') str++;
@@ -28,7 +29,6 @@ void trim_leading_spaces(char *str) {
 SQLCommand parse_sql(const char *command) {
   SQLCommand cmd;
 
-  // Initialize the command structure
   cmd.type = CMD_UNKNOWN;
   cmd.column_count = 0;
   cmd.limit = -1;
@@ -55,6 +55,24 @@ SQLCommand parse_sql(const char *command) {
 
   char *token = strtok(query, " ");
   if (!token) return cmd;
+
+  if (strcasecmp(token, "CREATE") == 0) {
+    token = strtok(NULL, " ");
+    if (token && strcasecmp(token, "TABLE") == 0) {
+      cmd.type = CMD_CREATE;
+      strcpy(cmd.table, strtok(NULL, " (")); 
+      
+      char *col_definitions = strtok(NULL, ")");
+      if (col_definitions) {
+        char *col_token = strtok(col_definitions, ",");
+        while (col_token) {
+          strcpy(cmd.columns[cmd.column_count], trim(col_token));
+          col_token = strtok(NULL, ",");
+          cmd.column_count++;
+        }
+      }
+    }
+  }
 
   if (strcasecmp(token, "INSERT") == 0) {
     cmd.type = CMD_INSERT;
@@ -132,91 +150,148 @@ SQLCommand parse_sql(const char *command) {
 }
 
 bool execute_command(SQLCommand *cmd) {
-  if (cmd->type == CMD_INSERT) {
-    printf("Executing INSERT into %s\n", cmd->table);
-    for (int i = 0; i < cmd->column_count; i++) {
-      printf("\t  %s = %s\n", cmd->columns[i], cmd->values[i]);
-    }
-  } else if (cmd->type == CMD_SELECT) {
-    printf("Executing SELECT on %s\n", cmd->table);
-    if (cmd->column_count > 0) {
-      printf("\tColumns: \n");
+  switch (cmd->type) {
+    case CMD_CREATE:
+      printf("Creating table %s\n", cmd->table);
+      printf("Columns:\n");
       for (int i = 0; i < cmd->column_count; i++) {
-        printf("%s ", cmd->columns[i]);
+        printf("  - %s\n", cmd->columns[i]);
       }
-    }
+      break;
 
-    if (strlen(cmd->where_clause) > 0) {
-      printf("\tWHERE %s\n", cmd->where_clause);
-    }
+    case CMD_INSERT:
+      printf("Executing INSERT into %s\n", cmd->table);
+      for (int i = 0; i < cmd->column_count; i++) {
+        printf("\t  %s = %s\n", cmd->columns[i], cmd->values[i]);
+      }
+      break;
 
-    if (strlen(cmd->order_by) > 0) {
-      printf("\tORDER BY %s\n", cmd->order_by);
-    }
+    case CMD_SELECT:
+      printf("Executing SELECT on %s\n", cmd->table);
+      if (cmd->column_count > 0) {
+        printf("\tColumns: \n");
+        for (int i = 0; i < cmd->column_count; i++) {
+          printf("%s ", cmd->columns[i]);
+        }
+        printf("\n");
+      }
 
-    if (cmd->limit > 0) {
-      printf("\tLIMIT %d\n", cmd->limit);
-    }
-  } else if (cmd->type == CMD_HELP) {
-    printf(
-      "\nJUGAD-DB COMMAND REFERENCE\n"
+      if (cmd->where_clause && strlen(cmd->where_clause) > 0) {
+        printf("\tWHERE %s\n", cmd->where_clause);
+      }
 
-      "GENERAL COMMANDS\n"
-      "  .quit                Exit the database system.\n"
-      "  .help                Show this help menu.\n\n"
+      if (cmd->order_by && strlen(cmd->order_by) > 0) {
+        printf("\tORDER BY %s\n", cmd->order_by);
+      }
 
-      "DATA DEFENITION LANGUAGE (JDL)\n"
-      "  CREATE TABLE <name> (<column definitions>);\n"
-      "      Define a new table.\n"
-      "  ALTER TABLE <name> ADD COLUMN <column definition>;\n"
-      "      Modify an existing table.\n\n"
+      if (cmd->limit > 0) {
+        printf("\tLIMIT %d\n", cmd->limit);
+      }
+      break;
 
-      "DATA QUERY / MODIFICATION LANGUAGE (DQL)\n"
-      "  INSERT INTO <table> (<columns>) VALUES (<values>);\n"
-      "      Insert new rows into a table.\n"
-      "  UPDATE <table> SET <column> = <value> WHERE <condition>;\n"
-      "      Update existing records.\n"
-      "  DELETE FROM <table> WHERE <condition>;\n"
-      "      Delete records.\n"
+    case CMD_HELP:
+      printf(
+        "\nJUGAD-DB COMMAND REFERENCE\n"
 
-      "  SELECT <columns> FROM <table> WHERE <condition> ORDER BY <column> [ASRT|DSRT] LIMIT <n>;\n"
-      "      Retrieve data from a table.\n"
-      "  SELECT <columns> FROM <table> JOIN <table> ON <condition>;\n"
-      "      Perform joins between tables.\n"
-      "  SELECT <column>, SUM(<column>) AS <alias> FROM <table> GROUP BY <column>;\n"
-      "      Aggregate data.\n\n"
+        "GENERAL COMMANDS\n"
+        "  .quit                Exit the database system.\n"
+        "  .help                Show this help menu.\n\n"
 
-      "SYNTAX NOTES\n"
-      "  - PRM  : Primary Key\n"
-      "  - FRN REF <table>(<column>) : Foreign Key\n"
-      "  - ODR  : ORDER BY\n"
-      "  - ASRT : Ascending order (default)\n"
-      "  - DSRT : Descending order\n"
-      "  - LIM  : LIMIT rows returned\n\n"
+        "DATA DEFINITION LANGUAGE (JDL)\n"
+        "  CREATE TABLE <name> (<column definitions>);\n"
+        "      Define a new table.\n"
+        "  ALTER TABLE <name> ADD COLUMN <column definition>;\n"
+        "      Modify an existing table.\n\n"
 
-      "For further details and examples, refer to documentation and test/ .jql/.jcl files.\n\n"
-    );
-  } else {
-    printf("Unknown command! Use .help to obtain a list of valid commands and .quit to kill this session\n");
+        "DATA QUERY / MODIFICATION LANGUAGE (DQL)\n"
+        "  INSERT INTO <table> (<columns>) VALUES (<values>);\n"
+        "      Insert new rows into a table.\n"
+        "  UPDATE <table> SET <column> = <value> WHERE <condition>;\n"
+        "      Update existing records.\n"
+        "  DELETE FROM <table> WHERE <condition>;\n"
+        "      Delete records.\n"
+
+        "  SELECT <columns> FROM <table> WHERE <condition> ORDER BY <column> [ASRT|DSRT] LIMIT <n>;\n"
+        "      Retrieve data from a table.\n"
+        "  SELECT <columns> FROM <table> JOIN <table> ON <condition>;\n"
+        "      Perform joins between tables.\n"
+        "  SELECT <column>, SUM(<column>) AS <alias> FROM <table> GROUP BY <column>;\n"
+        "      Aggregate data.\n\n"
+
+        "SYNTAX NOTES\n"
+        "  - PRM  : Primary Key\n"
+        "  - FRN REF <table>(<column>) : Foreign Key\n"
+        "  - ODR  : ORDER BY\n"
+        "  - ASRT : Ascending order (default)\n"
+        "  - DSRT : Descending order\n"
+        "  - LIM  : LIMIT rows returned\n\n"
+
+        "For further details and examples, refer to documentation and test/ .jql/.jcl files.\n\n"
+      );
+      break;
+
+    default:
+      printf("Unknown command! Use .help to obtain a list of valid commands and .quit to kill this session\n");
+      return false;
   }
-  
 
   return true;
 }
 
 void start_session() {
   char command[256];
-  printf("Welcome to Jugad-DB! Type SQL commands or EXIT to quit.\n");
+  FILE *db_file = NULL;
+  char selected_db[256] = "";
+  char cwd[256] = "";
+
+  if (!getcwd(cwd, sizeof(cwd))) {
+    strcpy(cwd, "ukwn/"); 
+  }
+
+  printf("Welcome to Jugad-DB! Type '.schema <DATABASE_NAME.jdb>' to select a SCHEMA FILE\n");
 
   while (1) {
-    printf("jugad-db> ");
+    printf("%s: jugad-db@[%s] $ ", cwd, selected_db[0] ? selected_db : "~");
+    
     if (!fgets(command, sizeof(command), stdin)) break;
 
-    if (strcasecmp(trim(command), "EXIT") == 0) break;
+    command[strcspn(command, "\n")] = 0;
+
+    if (strncmp(command, ".schema ", 8) == 0) {
+      char *db_name = command + 8; 
+  
+      if (strlen(db_name) < 4 || strcmp(db_name + strlen(db_name) - 4, ".jdb") != 0) {
+        printf("Error: Invalid file. Please provide a .jdb file.\n");
+        continue;
+      }
+  
+      int db_existed = access(db_name, F_OK) == 0;
+      
+      if (db_file) fclose(db_file);
+
+      db_file = fopen(db_name, "w");
+      if (!db_file) {
+        printf("Error: Could not open or create database file '%s'.\n", db_name);
+        continue;
+      }
+  
+      strcpy(selected_db, db_name);
+
+      printf("Database %s: %s\n", db_existed ? "entered" : "created", selected_db);
+      continue;
+    }
+  
+
+    if (!db_file) {
+      printf("Error: No database selected. Use 'ENTER <database.jdb>' to select one.\n");
+      continue;
+    }
 
     SQLCommand parsed_command = parse_sql(command);
     execute_command(&parsed_command);
   }
 
   printf("Session closed.\n");
+
+  if (db_file) fclose(db_file);
 }

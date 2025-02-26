@@ -55,6 +55,19 @@ typedef struct {
   Field *fields;
 } Record;
 
+typedef struct {
+  char name[64];
+  DataType type;
+  int size; 
+} Column;
+
+typedef struct {
+  char table_name[64];
+  int column_count;
+  Column columns[16];
+} TableSchema;
+
+
 ObjectField create_object_field(const char *key, Field *value);
 ObjectType create_object(int field_count);
 void free_object(ObjectType *obj);
@@ -63,5 +76,7 @@ ArrayType create_int_array(int *values, int count);
 void free_array(ArrayType *arr);
 void write_record(FILE *file, Record *rec);
 void read_record(FILE *file, Record *rec);
+
+void create_table(const char *filename, const char *table_name, Column *columns, int column_count);
 
 #endif

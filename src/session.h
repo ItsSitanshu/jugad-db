@@ -9,7 +9,8 @@ typedef enum {
   CMD_UPDATE,
   CMD_DELETE,
   CMD_UNKNOWN,
-  CMD_HELP
+  CMD_HELP,
+  CMD_CREATE
 } CommandType;
 
 typedef struct {

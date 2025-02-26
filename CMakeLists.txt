@@ -11,7 +11,6 @@ set(SOURCES
   src/record.c
   src/session.c
   src/storage.c
-  src/transaction.c
   src/writer.c 
 )
 
