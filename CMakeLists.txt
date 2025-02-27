@@ -3,18 +3,15 @@ project(JugadDB C)
 
 set(CMAKE_C_STANDARD 11)
 
-include_directories(src)
+include_directories(src/db src/utils)
 
-set(SOURCES
-  src/main.c
-  src/storage.c
-  src/record.c
-  src/session.c
-  src/storage.c
-  src/jdl.c 
-  src/parser.c
-)
+file(GLOB DB_SOURCES src/db/*.c)
+file(GLOB UTILS_SOURCES src/utils/*.c)
 
-add_executable(jugad ${SOURCES})
+add_library(jugaddb STATIC ${DB_SOURCES} ${UTILS_SOURCES})
 
-target_link_libraries(jugad)
+add_executable(jugad-cli src/cli.c)
+target_link_libraries(jugad-cli PRIVATE jugaddb)
+
+add_executable(jugad-svr src/server.c)
+target_link_libraries(jugad-svr PRIVATE jugaddb)
